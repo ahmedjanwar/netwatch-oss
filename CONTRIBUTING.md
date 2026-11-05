@@ -28,6 +28,7 @@ install.sh           the one-line installer
 scripts/netwatch     the `netwatch` command (status, update, gateway on/off…)
 gateway/app/         the Python app (FastAPI): engine, DHCP/DNS, firewall, Telegram, insights
 gateway/web/         the dashboard (plain HTML, CSS and JavaScript, no build step)
+tests/               the tests (pytest), run by CI on every push and pull request
 lab/                 a test VM with a fake home network
 ```
 
@@ -43,11 +44,34 @@ sudo NETWATCH_SRC=/path/to/your/netwatch-oss bash /path/to/your/netwatch-oss/ins
 
 See [lab/README.md](lab/README.md) for building the VM.
 
+### Tests
+
+The tests live in [`tests/`](tests/) and run with [pytest](https://docs.pytest.org). CI runs every file
+in that folder on each push and pull request, so **a test you add is checked automatically from then on.**
+
+Run them yourself in Netwatch's own image (Python 3.13, nothing to install on your machine):
+
+```sh
+docker compose build
+docker run --rm -v "$PWD:/src" -w /src netwatch:latest \
+  sh -c "pip install -q -r requirements-dev.txt && python -m pytest tests"
+```
+
+Or with Python 3.13 locally: `pip install -r gateway/requirements.txt -r requirements-dev.txt && pytest tests`.
+
+To add a test, create `tests/test_<something>.py` with functions named `test_...`. Write test names as
+plain sentences, like the existing ones (`test_dhcp_skips_tiny_leftover_ranges`).
+[`conftest.py`](tests/conftest.py) points Netwatch at a throwaway data folder and a fake home network on
+the loopback interface, so tests never touch a real network. For the web app, see
+[`test_first_run.py`](tests/test_first_run.py), which signs in and walks the whole first-run flow.
+
+**Fixing a bug? Add a test that fails without your fix.**
+
 ### Before you open a pull request
 
 1. Branch from `main` (`fix/123-short-name` or `feat/short-name`) and link the issue.
 2. Keep each pull request to one change.
-3. Run the self-test, which CI also runs:
+3. Run the tests (above) and the self-test, which CI also runs:
    ```sh
    docker compose build && docker run --rm --network none --cap-add NET_ADMIN netwatch:latest python -m app.selftest
    ```

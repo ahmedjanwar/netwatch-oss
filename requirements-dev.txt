@@ -1,0 +1,3 @@
+# For running the tests (see CONTRIBUTING.md). The app's own dependencies are in gateway/requirements.txt.
+pytest==8.*
+httpx==0.28.*

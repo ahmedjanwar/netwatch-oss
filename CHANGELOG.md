@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Tests:** a pytest suite in `tests/` (configuration, passwords, router names, traffic parsing, the
+  whole first-run flow through the web app), run by CI on every push and pull request.
+
 ## 0.1.0
 
 First public release.

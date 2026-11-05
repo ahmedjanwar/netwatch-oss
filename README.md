@@ -99,7 +99,8 @@ sudo netwatch uninstall        remove Netwatch
 
 ## Contributing
 
-Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Every pull
+request runs the tests in [`tests/`](tests/), including any you add.
 The [`lab/`](lab/) folder has a virtual machine with a fake home network (a router, a phone, a TV and a
 laptop), so you can try changes without touching your own network.
 
