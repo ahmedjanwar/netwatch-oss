@@ -1,0 +1,36 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please don't paste passwords, Telegram tokens or your full device list.
+        Security problems go to [private reporting](https://github.com/ahmedjanwar/netwatch-oss/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [Monitor only, Gateway mode, Not sure]
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Status and logs
+      description: Output of `sudo netwatch status` and the relevant part of `sudo netwatch logs`.
+      render: text
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: "Ubuntu 24.04 on an old laptop, wired; TP-Link router"
+    validations:
+      required: true

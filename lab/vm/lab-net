@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Builds the fake home network inside the lab VM. Idempotent; run at boot by lab-net.service.
+#
+#   UTM shared network (NAT behind the Mac, isolated from the real home LAN)
+#     └─ eth0 ─ [netns "isp-router" 10.77.0.254]   plays the ISP router: NAT + port forwards
+#                    └─ lab-br  10.77.0.0/24        the fake home LAN
+#                         ├─ VM host 10.77.0.1      runs Netwatch, like the gateway laptop
+#                         └─ fake devices            netns phone / tv / laptop (lab-devices)
+set -euo pipefail
+
+LAN_IP=10.77.0.1
+ROUTER_IP=10.77.0.254
+
+# The VM's uplink: whatever interface UTM gave us (enp0s1 on virtio), unless already moved.
+if ! ip netns list | grep -qw isp-router; then
+  WAN=$(ip -4 route show default | awk '{print $5; exit}')
+  [ -n "$WAN" ] || { echo "no default route yet" >&2; exit 1; }
+  echo "$WAN" > /run/lab-wan
+  ip netns add isp-router
+fi
+WAN=$(cat /run/lab-wan 2>/dev/null || echo enp0s1)
+
+# 1. The fake home LAN bridge, owned by the VM host (Netwatch's NW_IFACE).
+ip link show lab-br >/dev/null 2>&1 || ip link add lab-br type bridge
+ip addr replace "$LAN_IP/24" dev lab-br
+ip link set lab-br up
+
+# 2. The ISP router: one leg on the LAN, and the real uplink moved inside it.
+if ! ip link show r-lan >/dev/null 2>&1; then
+  ip link add r-lan type veth peer name r-lan-in
+  ip link set r-lan-in netns isp-router
+  ip link set r-lan master lab-br up
+fi
+ip -n isp-router addr replace "$ROUTER_IP/24" dev r-lan-in
+ip -n isp-router link set r-lan-in address 02:77:00:00:00:fe up
+ip -n isp-router link set lo up
+if ip link show "$WAN" >/dev/null 2>&1; then
+  ip link set "$WAN" netns isp-router
+fi
+ip -n isp-router link set "$WAN" up
+# The router gets its WAN address from UTM's DHCP, like an ISP router from the ISP.
+mkdir -p /var/lib/lab /etc/netns/isp-router
+echo "nameserver 9.9.9.9" > /etc/netns/isp-router/resolv.conf
+if ! ip netns exec isp-router ip -4 addr show "$WAN" | grep -q inet; then
+  ip netns exec isp-router dhclient -4 -pf /run/dhclient-lab-router.pid \
+    -lf /var/lib/dhcp/dhclient.lab-router.leases "$WAN"
+fi
+ip netns exec isp-router sysctl -qw net.ipv4.ip_forward=1
+WAN_IP=$(ip -n isp-router -4 -o addr show "$WAN" | awk '{print $4}' | cut -d/ -f1)
+echo "$WAN_IP" > /run/lab-wan-ip
+
+# Router NAT, plus port forwards so the Mac can reach SSH and the dashboard.
+ip netns exec isp-router nft -f - <<EOF
+table ip lab
+delete table ip lab
+table ip lab {
+  chain pre {
+    type nat hook prerouting priority -100;
+    iifname "$WAN" tcp dport { 22, 8088 } dnat to $LAN_IP
+  }
+  chain post {
+    type nat hook postrouting priority 100;
+    oifname "$WAN" ip saddr 10.77.0.0/24 masquerade
+  }
+}
+EOF
+
+# The router's DHCP and DNS, like a real home router out of the box. Turn DHCP off the way you
+# would in a router's admin page with:  sudo lab-router dhcp off
+lab-router dhcp "$(cat /var/lib/lab/router-dhcp 2>/dev/null || echo on)"
+
+# 3. The VM host reaches the internet through the ISP router, like the gateway laptop.
+ip route replace default via "$ROUTER_IP" dev lab-br
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\nDNS=9.9.9.9 149.112.112.112\nDomains=~.\n' > /etc/systemd/resolved.conf.d/lab.conf
+systemctl restart systemd-resolved || true
+
+echo "lab network up: LAN 10.77.0.0/24, router $ROUTER_IP, reachable from the Mac at $WAN_IP"

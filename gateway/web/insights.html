@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Netwatch · Insights</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/insights.css">
+</head>
+<body class="doc">
+  <header>
+    <div class="brand"><span class="logo">◈</span> NETWATCH</div>
+    <div style="flex:1"></div>
+    <nav class="right">
+      <a href="/" class="nav">Dashboard</a><a href="/insights" class="nav active">Insights</a><a href="/settings" class="nav">Settings</a>
+    </nav>
+  </header>
+
+  <div class="page wide">
+    <div class="ins-head">
+      <div>
+        <h1>Insights</h1>
+        <p class="lead" id="subtitle">How your network is used, and how healthy your internet is.</p>
+      </div>
+      <div class="seg" role="tablist" aria-label="Time range">
+        <button data-range="today">Today</button><button data-range="7d" class="on">7 days</button><button data-range="30d">30 days</button>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><label>Total data</label><b id="t-total">–</b><span id="t-total-sub"></span></div>
+      <div class="tile"><label>Busiest device</label><b id="t-dev">–</b><span id="t-dev-sub"></span></div>
+      <div class="tile"><label>Top app</label><b id="t-app">–</b><span id="t-app-sub"></span></div>
+      <div class="tile"><label>Internet latency</label><b id="t-lat">–</b><span id="t-lat-sub"></span></div>
+      <div class="tile"><label>Peak speed</label><b id="t-peak">–</b><span id="t-peak-sub"></span></div>
+    </div>
+
+    <section class="panel-card" id="unusual-card">
+      <h2>Worth a look</h2>
+      <div id="unusual"></div>
+    </section>
+
+    <section class="panel-card">
+      <div class="card-head"><h2 id="usage-title">Data per day</h2>
+        <div class="legend-row"><span><i class="sw" style="background:var(--c-down)"></i>Download</span><span><i class="sw" style="background:var(--c-up)"></i>Upload</span></div></div>
+      <canvas id="c-daily" class="viz" style="height:220px"></canvas>
+    </section>
+
+    <div class="two">
+      <section class="panel-card">
+        <div class="card-head"><h2>Devices</h2><span class="muted small">total data</span></div>
+        <div id="devices" class="hbars"></div>
+      </section>
+      <section class="panel-card">
+        <div class="card-head"><h2>Top apps</h2><span class="muted small">by data, from routed devices</span></div>
+        <div id="apps" class="hbars"></div>
+      </section>
+    </div>
+
+    <section class="panel-card">
+      <div class="card-head"><h2>When your network is busy</h2>
+        <div class="legend-row"><span class="muted small">less</span><span class="ramp"></span><span class="muted small">more</span></div></div>
+      <canvas id="c-heat" class="viz" style="height:230px"></canvas>
+    </section>
+
+    <div class="two">
+      <section class="panel-card">
+        <div class="card-head"><h2>Latency</h2>
+          <div class="legend-row"><span><i class="sw" style="background:var(--c-net)"></i>Internet (1.1.1.1)</span><span><i class="sw" style="background:var(--c-router)"></i><span class="router-label">Router</span></span></div></div>
+        <canvas id="c-lat" class="viz" style="height:200px"></canvas>
+        <div id="outages" class="outages"></div>
+      </section>
+      <section class="panel-card">
+        <div class="card-head"><h2>Peak speed through Netwatch</h2></div>
+        <canvas id="c-cap" class="viz" style="height:200px"></canvas>
+        <p class="note" id="cap-note"></p>
+      </section>
+    </div>
+  </div>
+
+  <div id="tip" class="tip hidden"></div>
+  <script src="/static/insights.js"></script>
+</body>
+</html>

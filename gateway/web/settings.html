@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Netwatch · Settings</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="doc">
+  <header>
+    <div class="brand"><span class="logo">◈</span> NETWATCH </div>
+    <div style="flex:1"></div>
+    <nav class="right">
+      <a href="/" class="nav">Dashboard</a><a href="/insights" class="nav">Insights</a><a href="/settings" class="nav active">Settings</a>
+      <button id="logout" class="ghost">Log out</button>
+    </nav>
+  </header>
+
+    <div class="page">
+    <h1>Settings</h1>
+    <p class="lead">Tap a section to open it.</p>
+
+    <details class="section" id="setup">
+      <summary>
+        <span class="s-icon">🚀</span>
+        <span class="s-title"><b>Setup guide: gateway mode</b><small>Route your devices through Netwatch, step by step, with live checks</small></span>
+        <span class="pill wait s-badge" id="badge-setup">…</span>
+        <span class="chev" aria-hidden="true">›</span>
+      </summary>
+      <div class="s-body">
+
+    <div class="card">
+      <div class="check" style="margin:0">
+        <b style="flex:1">Progress</b>
+        <span id="checked" class="muted" style="font-size:12px"></span>
+        <button id="recheck" class="btn">Re-check now</button>
+      </div>
+    </div>
+
+    <div class="note warn">
+      Before you start, keep your phone on <b>mobile data</b> with this page open, so you can still read it
+      if Wi-Fi drops halfway. If anything goes wrong, see <a href="#rollback">Undo everything</a> at the bottom.
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="card step" id="s1">
+      <div class="num">1</div>
+      <div>
+        <h3>Give this machine a fixed IP address</h3>
+        <p>
+          Right now this machine gets its address (<span class="self-ip mono"></span>) from <span class="router-name">your router</span>.
+          Once <span class="router-name">your router</span> stops handing out addresses in step 2, this machine would lose it, so you fix it first.
+        </p>
+        <p>On this machine (or over SSH), run:</p>
+        <div class="code"><code>sudo netwatch static-ip</code><button data-copy>Copy</button></div>
+        <p class="note">You should see <code>Static IP active and internet works.</code> The address doesn't change, so an SSH session stays connected.</p>
+        <div class="check">This machine's IP is fixed: <span id="c-static" class="pill wait">checking…</span></div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="card step" id="s2">
+      <div class="num">2</div>
+      <div>
+        <h3>Turn off DHCP and IPv6 on <span class="router-name">your router</span></h3>
+        <p>
+          Open <span class="router-name">your router</span>'s admin page at <a href="" class="router-link" target="_blank" rel="noopener"></a>
+          and sign in (the default login is usually printed on the sticker under the router).
+          Menu names differ between routers, but look for:
+        </p>
+        <ol>
+          <li><b>Local Network</b> (sometimes <i>LAN</i> or <i>Home Network</i>) → <b>DHCP server</b> → set it to <b>Off/Disabled</b> → Save.</li>
+          <li>Under <b>IPv6</b>, turn off <b>IPv6 on the LAN</b> completely ("IPv6 state" → Off). Turning off only the
+            "DHCPv6 server" is <b>not enough</b>: most routers also hand out their DNS in <i>Router Advertisements</i>.
+            While that's on, phones and laptops use your internet provider's DNS over IPv6 and skip Netwatch and the ad blocker.</li>
+        </ol>
+        <p class="note">Nothing breaks yet: devices keep their current addresses until their lease runs out, which takes hours.</p>
+        <div class="check"><span><span class="router-name-cap">Your router</span> stopped handing out addresses:</span> <span id="c-dhcp" class="pill wait">checking…</span></div>
+        <div class="check"><span>IPv6 on <span class="router-name">your router</span>'s LAN turned off:</span> <span id="c-ipv6" class="pill wait">checking…</span></div>
+
+        <h3 class="sub-h">While you're in your router's settings (recommended)</h3>
+        <p class="muted" style="font-size:13px;margin-top:0">Tick these off as you go. They're saved in this browser.</p>
+        <label class="tick"><input type="checkbox" data-key="admin-pw"><span>Change the router's <b>admin password</b> from the default</span></label>
+        <label class="tick"><input type="checkbox" data-key="firmware"><span>Check for a <b>firmware update</b> (often under <i>Gateway</i> or <i>System</i>)</span></label>
+        <label class="tick"><input type="checkbox" data-key="wpa"><span>Wi-Fi security set to <b>WPA2/WPA3</b> (or WPA3), with a long Wi-Fi password</span></label>
+        <label class="tick"><input type="checkbox" data-key="wps"><span>Turn <b>WPS off</b></span></label>
+        <label class="tick"><input type="checkbox" data-key="upnp"><span>Turn <b>UPnP off</b> (under <i>Advanced</i> or <i>NAT</i>)</span></label>
+        <label class="tick"><input type="checkbox" data-key="remote"><span>Turn <b>remote management off</b></span></label>
+        <label class="tick"><input type="checkbox" data-key="guest"><span>Optional: turn on a <b>guest network</b> for visitors</span></label>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="card step" id="s3">
+      <div class="num">3</div>
+      <div>
+        <h3>Turn on gateway mode</h3>
+        <p>
+          Netwatch starts handing out addresses and names itself as every device's gateway and DNS server.
+          The button only works once steps 1 and 2 are done.
+        </p>
+        <div class="check">
+          <button id="gw-on" class="btn big" disabled>Turn on gateway mode</button>
+          <span id="c-mode" class="pill wait">checking…</span>
+        </div>
+        <div id="gw-msg" class="msg"></div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="card step" id="s4">
+      <div class="num">4</div>
+      <div>
+        <h3>Move your devices over</h3>
+        <p>Each device switches the next time it renews its address. To make that happen now:</p>
+        <ul>
+          <li><b>Phones, tablets, laptops:</b> turn Wi-Fi off and back on.</li>
+          <li><b>TV, PlayStation, PC:</b> restart them, or unplug for 10 seconds.</li>
+          <li><b>Smart bulbs and plugs:</b> they switch over by themselves within an hour. Flick them off and on at the wall to speed it up.</li>
+        </ul>
+        <p>On the <a href="/">dashboard</a>, a device's ring turns from dashed to <b>solid</b> once it's routed.</p>
+        <div class="check">Devices routed through Netwatch: <span id="c-routed" class="pill wait">checking…</span></div>
+        <div id="not-routed" class="note" style="display:none"></div>
+      </div>
+    </div>
+
+    <h3 id="rollback" class="sub-h">Undo everything</h3>
+    <div class="card">
+      <p style="margin-top:0">If the internet stops working, or you just want to go back:</p>
+      <ol>
+        <li><span class="router-name-cap">Your router</span>'s admin page: turn its <b>DHCP server back on</b>.</li>
+        <li>Turn gateway mode off: <button id="gw-off" class="btn warn">Turn off gateway mode</button> <span id="off-msg" class="msg"></span></li>
+        <li>Turn Wi-Fi off and on on your devices.</li>
+      </ol>
+      <p class="note">
+        If the dashboard itself won't load, run <code>sudo netwatch gateway off</code> on this machine.
+        Its fixed IP can stay as it is; it's harmless (or undo it with <code>sudo netwatch static-ip revert</code>).
+      </p>
+    </div>
+
+    <h3 class="sub-h">Good to know</h3>
+    <div class="card">
+      <ul style="margin:0;padding-left:20px">
+        <li><b>This machine is now critical.</b> If it's off, devices lose internet until you turn <span class="router-name">your router</span>'s DHCP back on.
+          Keep it plugged in (on a laptop, set closing the lid to "do nothing").</li>
+        <li><b>Blocking</b> cuts a device's internet but keeps it on your home network. A tech-savvy user could get around it by
+          manually setting their gateway to <span class="router-name">your router</span>.</li>
+        <li><b>Port forwarding</b> set up on <span class="router-name">your router</span> won't work for devices behind Netwatch.</li>
+        <li><b>Casting and AirPlay</b> go directly between devices, so that traffic doesn't show on the dashboard.</li>
+        <li>Addresses are leased for 1 hour, so changes and rollbacks take effect quickly.</li>
+      </ul>
+    </div>
+  
+      </div>
+    </details>
+
+    <details class="section" id="shield">
+      <summary>
+        <span class="s-icon">🛡</span>
+        <span class="s-title"><b>Ad blocker</b><small>Block ads &amp; trackers for every device, force DNS, allowlist</small></span>
+        <span class="pill wait s-badge" id="badge-shield">…</span>
+        <span class="chev" aria-hidden="true">›</span>
+      </summary>
+      <div class="s-body"><div class="card" id="shield">
+      <label class="toggle"><input type="checkbox" id="shield-on">
+        <span><b>Block ads &amp; trackers on every device.</b> Uses the StevenBlack list (ads + malware), updated daily.</span></label>
+      <p id="shield-stats" class="muted" style="font-size:13px;margin:10px 0 0"></p>
+      <p id="shield-err" class="msg err"></p>
+      <label class="toggle" style="margin-top:14px"><input type="checkbox" id="shield-force">
+        <span><b>Force all devices to use Netwatch DNS.</b> Catches devices with hardcoded DNS (some TVs) and Android "Private DNS",
+          and turns off Firefox's built-in DNS. This also identifies the "Unknown" traffic on the Insights page.</span></label>
+      <p class="note">Doesn't affect ⚡ full-speed devices: their traffic skips Netwatch. Apple's iCloud Private Relay (Safari) still bypasses it.</p>
+
+      <h3 style="margin-top:18px">Allowlist</h3>
+      <p class="muted" style="font-size:13px;margin-top:0">If a site or app breaks, add its domain here (one per line). Subdomains are included.</p>
+      <textarea id="shield-allow" rows="4" spellcheck="false" placeholder="e.g. ads.example-shop.com"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button id="shield-save" class="btn">Save allowlist</button>
+        <button id="shield-refresh" class="btn">Update blocklist now</button>
+      </div>
+      <div id="shield-msg" class="msg"></div>
+
+      <h3 style="margin-top:18px">Most blocked today</h3>
+      <div id="shield-top" class="domains" style="font-family:var(--mono);font-size:12px"></div>
+    </div>
+
+    
+      </div>
+    </details>
+
+    <details class="section" id="telegram">
+      <summary>
+        <span class="s-icon">🤖</span>
+        <span class="s-title"><b>Telegram bot</b><small>Alerts, new-device approval, remote control</small></span>
+        <span class="pill wait s-badge" id="badge-telegram">…</span>
+        <span class="chev" aria-hidden="true">›</span>
+      </summary>
+      <div class="s-body"><div class="card" id="tg">
+      <div id="tg-off" class="hidden">
+        <p style="margin-top:0">No bot yet. Message <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> on Telegram,
+          send <code>/newbot</code>, and paste the token it gives you here:</p>
+        <form id="tg-token-form" class="inline-form">
+          <input id="tg-token" class="mono" placeholder="123456789:ABC-your-bot-token" autocomplete="off">
+          <button class="btn">Save token</button>
+        </form>
+        <div id="tg-token-msg" class="msg"></div>
+      </div>
+      <div id="tg-unpaired" class="hidden">
+        <p style="margin-top:0">Connect your Telegram so the bot can ask you before new devices get internet.</p>
+        <button id="tg-code" class="btn big">Get pairing code</button>
+        <div id="tg-code-box" class="hidden" style="margin-top:14px">
+          <p>1. Open <a id="tg-link" target="_blank" rel="noopener"></a> in Telegram and press <b>Start</b>.</p>
+          <p>2. Send this message to the bot (the code is valid for 10 minutes):</p>
+          <div class="code"><code id="tg-cmd"></code><button data-copy>Copy</button></div>
+          <p class="muted" id="tg-wait">Waiting for your message…</p>
+        </div>
+      </div>
+      <div id="tg-paired" class="hidden">
+        <p style="margin-top:0">✅ Paired with <b id="tg-name"></b> via <a id="tg-link2" target="_blank" rel="noopener"></a></p>
+        <label class="toggle"><input type="checkbox" id="tg-approval">
+          <span><b>Require approval for new devices.</b> Unknown devices get no internet until you tap Allow in Telegram (or on the dashboard).</span></label>
+        <p class="note">Phones with "private Wi-Fi address" turned on can show up as a new device if they reset that address. Just approve them again.</p>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button id="tg-test" class="btn">Send test message</button>
+          <button id="tg-unpair" class="btn warn">Unpair</button>
+        </div>
+        <div id="tg-msg" class="msg"></div>
+      </div>
+    </div>
+
+    
+      </div>
+    </details>
+
+    <details class="section" id="password">
+      <summary>
+        <span class="s-icon">🔑</span>
+        <span class="s-title"><b>Dashboard password</b><small>Change it, or reset it if you forgot it</small></span>
+        <span class="pill wait s-badge" id="badge-password">…</span>
+        <span class="chev" aria-hidden="true">›</span>
+      </summary>
+      <div class="s-body"><form id="pw-form" class="card" autocomplete="on">
+      <input type="text" name="username" value="netwatch" autocomplete="username" hidden>
+      <div class="form-row">
+        <label for="cur">Current password</label>
+        <input id="cur" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="form-row">
+        <label for="new1">New password (at least 8 characters)</label>
+        <input id="new1" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div class="form-row">
+        <label for="new2">Repeat new password</label>
+        <input id="new2" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <button class="btn big">Change password</button>
+      <div id="pw-msg" class="msg"></div>
+      <p class="note">Changing the password signs out every other browser and phone. This one stays signed in.</p>
+    </form>
+
+    <h3 class="sub-h">Forgot your password?</h3>
+    <div class="card">
+      <p style="margin-top:0">On the machine running Netwatch (or over SSH), run:</p>
+      <div class="code"><code>sudo netwatch reset-password</code><button data-copy>Copy</button></div>
+      <p class="note">It prints a new temporary password. Sign in with it and you'll be asked to choose a new one.</p>
+    </div>
+  
+      </div>
+    </details>
+  </div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+
+// ---------- collapsible sections: remember open/closed, open via #hash ----------
+function setBadge(id, state, text) {
+  const b = document.getElementById("badge-" + id);
+  if (b) { b.className = `pill ${state} s-badge`; b.textContent = text; }
+}
+const KEY = "nw-settings-open";
+const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+document.querySelectorAll("details.section").forEach((d) => {
+  if (saved[d.id]) d.open = true;
+  d.addEventListener("toggle", () => {
+    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    s[d.id] = d.open;
+    localStorage.setItem(KEY, JSON.stringify(s));
+  });
+});
+function openFromHash() {
+  const id = location.hash.slice(1);
+  const el = id && document.getElementById(id);
+  if (!el) return;
+  const sec = el.closest("details.section");
+  if (sec) sec.open = true;
+  setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+}
+addEventListener("hashchange", openFromHash);
+openFromHash();
+setBadge("password", "wait", "set");
+
+// ---------- copy buttons (whole page) ----------
+document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+  const text = b.previousElementSibling.textContent;
+  try { await navigator.clipboard.writeText(text); } catch {
+    const t = document.createElement("textarea");
+    t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+  }
+  b.textContent = "Copied";
+  setTimeout(() => (b.textContent = "Copy"), 1500);
+}));
+
+// ---------- setup guide ----------
+(() => {
+
+
+const escG = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function pill(el, state, text) {
+  el.className = `pill ${state}`;
+  el.textContent = text;
+}
+
+function stepState(id, done, current) {
+  const el = $(id);
+  el.classList.toggle("done", !!done);
+  el.classList.toggle("current", !done && !!current);
+}
+
+let st = null;
+async function refresh(force = false) {
+  $("#recheck").disabled = true;
+  try {
+    const r = await fetch(`/api/setup/status${force ? "?force=1" : ""}`);
+    if (r.status === 401) { location.href = "/login"; return; }
+    st = await r.json();
+    render();
+  } catch (e) {
+    setBadge("setup", "bad", "can't check");
+    $("#checked").textContent = "Couldn't reach Netwatch: " + e.message;
+  } finally {
+    $("#recheck").disabled = false;
+  }
+}
+
+function render() {
+  document.querySelectorAll(".self-ip").forEach((e) => (e.textContent = st.self_ip));
+  const rn = st.router_name && st.router_name !== "Router" ? `your ${st.router_name}` : "your router";
+  document.querySelectorAll(".router-name").forEach((e) => (e.textContent = rn));
+  document.querySelectorAll(".router-name-cap").forEach((e) => (e.textContent = rn[0].toUpperCase() + rn.slice(1)));
+  const rl = $(".router-link");
+  rl.href = `http://${st.router_ip}`;
+  rl.textContent = `http://${st.router_ip}`;
+
+  const s1 = st.static_ip === true;
+  pill($("#c-static"), s1 ? "ok" : "todo", s1 ? "done" : "not yet, still getting it from DHCP");
+
+  const dhcpOff = st.router_dhcp_on === false;
+  if (st.router_dhcp_on === null) pill($("#c-dhcp"), "wait", "can't check until step 1 is done");
+  else pill($("#c-dhcp"), dhcpOff ? "ok" : "todo",
+    dhcpOff ? "done" : `still on (answering: ${st.dhcp_servers.filter((s) => s !== st.self_ip).join(", ")})`);
+  pill($("#c-ipv6"), st.ipv6_ra ? "todo" : "ok", st.ipv6_ra ? "still on" : "done");
+  const s2 = dhcpOff && !st.ipv6_ra;
+
+  const s3 = st.gateway_mode;
+  pill($("#c-mode"), s3 ? "ok" : "todo", s3 ? "gateway mode is ON" : "off (monitor mode)");
+  const btn = $("#gw-on");
+  btn.disabled = s3 || !s1 || !dhcpOff;
+  btn.textContent = s3 ? "Gateway mode is on" : "Turn on gateway mode";
+  btn.title = !s1 ? "Finish step 1 first" : !dhcpOff ? "Turn off your router's DHCP first (step 2)" : "";
+  if (!s3 && s1 && dhcpOff && st.ipv6_ra) {
+    $("#gw-msg").className = "msg";
+    $("#gw-msg").textContent = "Tip: IPv6 is still on at your router. Gateway mode works, but IPv6 traffic won't show up.";
+  }
+
+  const all = st.online, routed = st.routed;
+  const s4 = s3 && all > 0 && routed >= all;
+  pill($("#c-routed"), s4 ? "ok" : s3 ? "todo" : "wait",
+    s3 ? `${routed} of ${all} online devices` : "after step 3");
+  const nr = $("#not-routed");
+  if (s3 && st.not_routed.length) {
+    nr.style.display = "";
+    nr.innerHTML = `<b>Not routed yet:</b> ${st.not_routed.map(escG).join(", ")}`;
+  } else nr.style.display = "none";
+
+  stepState("#s1", s1, true);
+  stepState("#s2", s2, s1);
+  stepState("#s3", s3, s1 && s2);
+  stepState("#s4", s4, s3);
+  const done = [s1, s2, s3, s4].filter(Boolean).length;
+  setBadge("setup", done === 4 ? "ok" : "todo", done === 4 ? "all done" : `${done}/4 done`);
+  $("#checked").textContent = st.checked_at ? `checked ${new Date(st.checked_at * 1000).toLocaleTimeString()}` : "";
+}
+
+async function setGateway(enabled, msgEl) {
+  msgEl.className = "msg";
+  msgEl.textContent = enabled ? "Turning on…" : "Turning off…";
+  const r = await fetch("/api/setup/gateway", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    msgEl.className = "msg err";
+    msgEl.textContent = body.detail || "Something went wrong";
+    return;
+  }
+  st = body;
+  render();
+  msgEl.className = "msg ok";
+  msgEl.textContent = enabled ? "Gateway mode is on. Now do step 4." : "Gateway mode is off. Turn your router's DHCP back on.";
+}
+
+let armed = null;
+$("#gw-on").addEventListener("click", () => setGateway(true, $("#gw-msg")));
+$("#gw-off").addEventListener("click", (e) => {
+  const b = e.currentTarget;
+  if (armed !== b) {
+    armed = b;
+    b.textContent = "Click again to confirm";
+    setTimeout(() => { if (armed === b) { armed = null; b.textContent = "Turn off gateway mode"; } }, 4000);
+    return;
+  }
+  armed = null;
+  b.textContent = "Turn off gateway mode";
+  setGateway(false, $("#off-msg"));
+});
+$("#recheck").addEventListener("click", () => refresh(true));
+
+
+document.querySelectorAll("[data-key]").forEach((cb) => {
+  const key = "nw-guide-" + cb.dataset.key;
+  cb.checked = localStorage.getItem(key) === "1";
+  cb.closest(".tick").classList.toggle("checked", cb.checked);
+  cb.addEventListener("change", () => {
+    localStorage.setItem(key, cb.checked ? "1" : "0");
+    cb.closest(".tick").classList.toggle("checked", cb.checked);
+  });
+});
+
+refresh(true);
+setInterval(() => refresh(false), 10000);
+})();
+
+
+
+$("#pw-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("#pw-msg");
+  msg.className = "msg";
+  if ($("#new1").value !== $("#new2").value) {
+    msg.className = "msg err";
+    msg.textContent = "The new passwords don't match.";
+    return;
+  }
+  msg.textContent = "Saving…";
+  const r = await fetch("/api/password", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current: $("#cur").value, new: $("#new1").value }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = "/login"; return; }
+  if (!r.ok) {
+    msg.className = "msg err";
+    msg.textContent = body.detail || "Couldn't change the password.";
+    return;
+  }
+  e.target.reset();
+  msg.className = "msg ok";
+  msg.textContent = "Password changed.";
+});
+// ---------- ad blocker ----------
+function abRender(st) {
+  $("#shield-on").checked = st.enabled;
+  $("#shield-force").checked = st.force_dns;
+  if (document.activeElement !== $("#shield-allow")) $("#shield-allow").value = st.allowlist.join("\n");
+  const upd = st.updated ? new Date(st.updated * 1000).toLocaleString() : "never";
+  $("#shield-stats").textContent = st.enabled
+    ? `Blocking ${st.domains.toLocaleString()} domains · ${st.blocked_today.toLocaleString()} lookups blocked today · list updated ${upd}`
+    : `Off. Nothing is blocked. (List: ${st.list_domains ? st.list_domains.toLocaleString() + " domains, " : ""}updated ${upd})`;
+  $("#shield-err").textContent = st.error || "";
+  setBadge("shield", st.enabled ? "ok" : "off", st.enabled ? `ON · ${st.blocked_today.toLocaleString()} blocked today` : "OFF");
+  $("#shield-top").innerHTML = st.top_today.length
+    ? st.top_today.map((t) => `<div class="domain"><span>${t.domain.replace(/[<>&"]/g, "")}</span><span class="muted">${t.n}</span></div>`).join("")
+    : `<div class="empty">Nothing blocked yet today.</div>`;
+}
+async function abLoad() {
+  const r = await fetch("/api/adblock");
+  if (r.ok) abRender(await r.json());
+}
+async function abPost(body, msg) {
+  $("#shield-msg").className = "msg";
+  $("#shield-msg").textContent = msg;
+  const r = await fetch("/api/adblock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const st = await r.json();
+  if (!r.ok) { $("#shield-msg").className = "msg err"; $("#shield-msg").textContent = st.detail || "Failed"; return; }
+  abRender(st);
+  $("#shield-msg").className = "msg ok";
+  $("#shield-msg").textContent = "Saved.";
+}
+$("#shield-on").addEventListener("change", (e) => abPost({ enabled: e.target.checked }, e.target.checked ? "Turning on (first time downloads the list)…" : "Turning off…"));
+$("#shield-force").addEventListener("change", (e) => abPost({ force_dns: e.target.checked }, "Saving…"));
+$("#shield-save").addEventListener("click", () => abPost({ allowlist: $("#shield-allow").value }, "Saving…"));
+$("#shield-refresh").addEventListener("click", async () => {
+  $("#shield-msg").className = "msg";
+  $("#shield-msg").textContent = "Downloading the latest list…";
+  const r = await fetch("/api/adblock/refresh", { method: "POST" });
+  abRender(await r.json());
+  $("#shield-msg").textContent = "Done.";
+});
+abLoad();
+
+// ---------- telegram ----------
+let tgPoll = null;
+async function tgLoad() {
+  const r = await fetch("/api/telegram");
+  if (r.status === 401) { location.href = "/login"; return; }
+  const t = await r.json();
+  $("#tg-off").classList.toggle("hidden", t.configured);
+  $("#tg-unpaired").classList.toggle("hidden", !t.configured || t.paired);
+  $("#tg-paired").classList.toggle("hidden", !t.paired);
+  const link = t.bot_username ? `https://t.me/${t.bot_username}` : "";
+  for (const id of ["#tg-link", "#tg-link2"]) {
+    $(id).href = link;
+    $(id).textContent = t.bot_username ? `@${t.bot_username}` : "your bot";
+  }
+  $("#tg-name").textContent = t.chat_name || "your Telegram";
+  $("#tg-approval").checked = t.require_approval;
+  setBadge("telegram", t.paired ? "ok" : t.configured ? "todo" : "off", t.paired ? `paired · ${t.chat_name || "you"}` : t.configured ? "not paired" : "no token");
+  if (t.paired && tgPoll) { clearInterval(tgPoll); tgPoll = null; }
+  return t;
+}
+$("#tg-code").addEventListener("click", async () => {
+  const r = await fetch("/api/telegram/pair-code", { method: "POST" });
+  const body = await r.json();
+  if (!r.ok) { $("#tg-wait").textContent = body.detail || "Error"; return; }
+  $("#tg-cmd").textContent = `/pair ${body.code}`;
+  $("#tg-code-box").classList.remove("hidden");
+  clearInterval(tgPoll);
+  tgPoll = setInterval(tgLoad, 3000);
+});
+$("#tg-approval").addEventListener("change", async (e) => {
+  await fetch("/api/settings/approval", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ require_approval: e.target.checked }),
+  });
+  tgMsg(e.target.checked ? "New devices now need approval." : "New devices get internet straight away (you'll still be notified).", true);
+});
+$("#tg-test").addEventListener("click", async () => {
+  const r = await fetch("/api/telegram/test", { method: "POST" });
+  tgMsg(r.ok ? "Sent! Check Telegram." : ((await r.json()).detail || "Failed"), r.ok);
+});
+let unpairArmed = false;
+$("#tg-unpair").addEventListener("click", async (e) => {
+  if (!unpairArmed) {
+    unpairArmed = true;
+    e.target.textContent = "Click again to unpair";
+    setTimeout(() => { unpairArmed = false; e.target.textContent = "Unpair"; }, 4000);
+    return;
+  }
+  await fetch("/api/telegram/unpair", { method: "POST" });
+  tgLoad();
+});
+function tgMsg(text, ok) {
+  const m = $("#tg-msg");
+  m.className = `msg ${ok ? "ok" : "err"}`;
+  m.textContent = text;
+}
+tgLoad();
+
+$("#logout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.href = "/login";
+});
+// ---------- telegram token ----------
+document.getElementById("tg-token-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("tg-token-msg");
+  msg.textContent = "Saving…";
+  const r = await fetch("/api/telegram/token", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: document.getElementById("tg-token").value }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { msg.textContent = d.detail || "Couldn't save the token"; return; }
+  msg.textContent = "Saved. Netwatch is restarting to connect the bot…";
+  setTimeout(() => location.reload(), 6000);
+});
+</script>
+</body>
+</html>

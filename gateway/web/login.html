@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Netwatch · Sign in</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; grid-template-rows: none; min-height: 100vh; margin: 0; }
+    form {
+      width: 320px; padding: 28px; border-radius: 16px; border: 1px solid var(--line);
+      background: var(--panel); box-shadow: 0 0 60px rgba(34, 211, 238, 0.08);
+    }
+    .brand { text-align: center; margin-bottom: 22px; font-size: 18px; }
+    input {
+      width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line);
+      background: rgba(2, 6, 14, 0.6); outline: none; margin-bottom: 12px;
+    }
+    input:focus { border-color: rgba(56, 189, 248, 0.5); }
+    button {
+      width: 100%; padding: 10px; border-radius: 9px; border: 1px solid rgba(34, 211, 238, 0.5);
+      background: rgba(34, 211, 238, 0.12); color: var(--down); font-weight: 600; cursor: pointer;
+    }
+    #err { color: var(--bad); font-size: 12px; min-height: 18px; margin-top: 10px; text-align: center; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 6px 0 0; text-align: center; }
+    .hint code { font-family: var(--mono); color: var(--text); }
+  </style>
+</head>
+<body>
+  <form id="f">
+    <div class="brand"><span class="logo">◈</span> NETWATCH</div>
+    <input id="pw" type="password" placeholder="Password" autofocus autocomplete="current-password">
+    <button>Unlock</button>
+    <div id="err"></div>
+    <p class="hint">First time here? Use the temporary password the installer printed.
+      Lost it? Run <code>sudo netwatch password</code> on this machine.</p>
+  </form>
+  <script>
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const err = document.getElementById("err");
+      err.textContent = "";
+      const r = await fetch("/api/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: document.getElementById("pw").value }),
+      });
+      if (r.ok) location.href = "/"; else err.textContent = "Wrong password";  // "/" sends first-timers on to /welcome
+    });
+  </script>
+</body>
+</html>

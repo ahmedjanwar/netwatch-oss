@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Netwatch · Welcome</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { display: flex; grid-template-rows: none; min-height: 100vh; height: auto; padding: 24px; overflow: auto; box-sizing: border-box; }
+    .card {
+      margin: auto;
+      width: min(620px, 100%); padding: 30px 32px; border-radius: 18px; border: 1px solid var(--line);
+      background: var(--panel); box-shadow: 0 0 70px rgba(34, 211, 238, 0.08);
+    }
+    .brand { font-size: 15px; letter-spacing: .18em; color: var(--muted); }
+    .progress { display: flex; gap: 6px; margin: 16px 0 26px; }
+    .progress i { flex: 1; height: 4px; border-radius: 4px; background: rgba(107, 127, 153, .25); }
+    .progress i.done { background: var(--down); }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    .lead { color: var(--muted); line-height: 1.55; margin: 0 0 22px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+    input, select {
+      width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line);
+      background: rgba(2, 6, 14, 0.6); color: var(--text); outline: none; font: inherit;
+    }
+    input:focus, select:focus { border-color: rgba(56, 189, 248, 0.5); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+    .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 26px; gap: 12px; }
+    button {
+      padding: 10px 18px; border-radius: 9px; border: 1px solid rgba(34, 211, 238, 0.5);
+      background: rgba(34, 211, 238, 0.12); color: var(--down); font-weight: 600; cursor: pointer; font: inherit;
+    }
+    button.ghost { border-color: var(--line); background: none; color: var(--muted); }
+    button:disabled { opacity: .5; cursor: default; }
+    .err { color: var(--bad); font-size: 13px; min-height: 18px; margin-top: 12px; }
+    .tiles { display: grid; gap: 12px; }
+    .tile { display: flex; gap: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
+    .tile > div > b { display: block; margin-bottom: 3px; }
+    .tile span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .tile span b { color: var(--text); font-weight: 600; }
+    .tile .ic { font-size: 22px; line-height: 1.2; }
+    .note { padding: 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5; margin-top: 16px; }
+    .note.warn { border: 1px solid rgba(251, 191, 36, .35); background: rgba(251, 191, 36, .07); color: #fcd34d; }
+    .note.info { border: 1px solid var(--line); background: rgba(56, 189, 248, .05); color: var(--muted); }
+    .toggle { display: flex; justify-content: space-between; align-items: center; gap: 16px;
+              padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .toggle:last-of-type { border-bottom: 0; }
+    .toggle b { display: block; } .toggle span { color: var(--muted); font-size: 13px; }
+    .switch { position: relative; width: 44px; height: 24px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch i { position: absolute; inset: 0; border-radius: 24px; background: rgba(107,127,153,.35); cursor: pointer; transition: .2s; }
+    .switch i::after { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+                       border-radius: 50%; background: #fff; transition: .2s; }
+    .switch input:checked + i { background: var(--ok); }
+    .switch input:checked + i::after { transform: translateX(20px); }
+    .mono { font-family: var(--mono); }
+    .strength { height: 4px; border-radius: 4px; margin-top: 8px; background: rgba(107,127,153,.25); overflow: hidden; }
+    .strength i { display: block; height: 100%; width: 0; transition: .2s; }
+    .step { display: none; } .step.on { display: block; }
+    .done-ic { font-size: 46px; margin-bottom: 8px; }
+    a { color: var(--down); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand"><span class="logo">◈</span> NETWATCH</div>
+    <div class="progress" id="progress"></div>
+
+    <!-- 1. Password -->
+    <section class="step" data-step="password">
+      <h1>Choose your own password</h1>
+      <p class="lead">You signed in with the temporary password from the installer. Pick a new one now:
+        anyone on your network can open this page, and this dashboard can block devices.</p>
+      <form id="pw-form">
+        <label for="pw1">New password</label>
+        <input id="pw1" type="password" autocomplete="new-password" autofocus>
+        <div class="strength"><i id="pw-meter"></i></div>
+        <label for="pw2">Type it again</label>
+        <input id="pw2" type="password" autocomplete="new-password">
+        <div class="err" id="pw-err"></div>
+        <div class="actions"><span></span><button id="pw-save">Save password</button></div>
+      </form>
+    </section>
+
+    <!-- 2. What Netwatch does -->
+    <section class="step" data-step="intro">
+      <h1>Welcome to Netwatch 👋</h1>
+      <p class="lead">Netwatch turns this machine into a control room for your home network.
+        Here's what it does, in 30 seconds.</p>
+      <div class="tiles">
+        <div class="tile"><div class="ic">🗺️</div><div><b>See every device</b>
+          <span>Phones, TVs, consoles and smart bulbs on a live map, with how much each one uses.</span></div></div>
+        <div class="tile"><div class="ic">🛡️</div><div><b>Stay in control</b>
+          <span>Block or pause a device, approve new ones before they get online, and block ads for the whole house.</span></div></div>
+        <div class="tile"><div class="ic">🔒</div><div><b>Private by design</b>
+          <span>Everything stays on this machine. Nothing is sent to anyone, apart from Telegram alerts if you turn them on.</span></div></div>
+        <div class="tile"><div class="ic">🚦</div><div><b>Starts safe</b>
+          <span>Netwatch begins in <b>monitor-only</b> mode and won't change your network. When you're ready,
+            the setup guide in Settings walks you through <b>gateway mode</b>, which is what blocking needs.</span></div></div>
+      </div>
+      <div class="actions"><span></span><button data-next>Let's set it up</button></div>
+    </section>
+
+    <!-- 3. Network -->
+    <section class="step" data-step="network">
+      <h1>Your network</h1>
+      <p class="lead">We looked at this machine and found these settings. They're usually right,
+        so only change them if you know they're wrong.</p>
+      <label for="iface">Network connection</label>
+      <select id="iface"></select>
+      <div class="row">
+        <div><label for="self_ip">This machine's address</label><input id="self_ip" class="mono"></div>
+        <div><label for="lan">Home network range</label><input id="lan" class="mono"></div>
+      </div>
+      <div class="row">
+        <div><label for="router_ip">Your router's address</label><input id="router_ip" class="mono"></div>
+        <div><label for="router_name">What to call your router</label><input id="router_name" maxlength="40" placeholder="Router"></div>
+      </div>
+      <div id="net-notes"></div>
+      <div class="err" id="net-err"></div>
+      <div class="actions"><button class="ghost" data-back>Back</button><button data-next id="net-next">Looks right</button></div>
+    </section>
+
+    <!-- 4. Features -->
+    <section class="step" data-step="features">
+      <h1>Pick your features</h1>
+      <p class="lead">You can change all of these later in Settings.</p>
+      <div class="toggle"><div><b>Block ads and trackers</b><span>For every device in the house, using a public block list.
+        Works once devices use Netwatch for DNS (gateway mode).</span></div>
+        <label class="switch"><input type="checkbox" id="adblock"><i></i></label></div>
+      <div class="toggle"><div><b>Approve new devices</b><span>A device that joins for the first time stays offline until you allow it.</span></div>
+        <label class="switch"><input type="checkbox" id="require_approval"><i></i></label></div>
+      <label for="telegram">Telegram bot token <span style="opacity:.7">(optional: alerts and buttons on your phone)</span></label>
+      <input id="telegram" class="mono" placeholder="123456789:ABC-your-bot-token" autocomplete="off">
+      <div class="note info">To get a token, message <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>
+        on Telegram, send <span class="mono">/newbot</span> and follow the steps. You'll pair your phone in Settings afterwards.
+        <span id="tg-set" hidden><br>A token is already set; leave this empty to keep it.</span></div>
+      <div class="err" id="feat-err"></div>
+      <div class="actions"><button class="ghost" data-back>Back</button><button id="finish">Finish setup</button></div>
+    </section>
+
+    <!-- 5. Done -->
+    <section class="step" data-step="done">
+      <div class="done-ic">✅</div>
+      <h1>You're all set</h1>
+      <p class="lead" id="done-msg">Netwatch is watching your network in monitor-only mode.</p>
+      <div class="note info"><b>Next step, when you're ready:</b> open <b>Settings → Setup guide</b> to switch on
+        gateway mode. That's what lets Netwatch block devices and ads and see all traffic.</div>
+      <div class="actions"><span></span><button id="go">Open the dashboard</button></div>
+    </section>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const STEPS = ["password", "intro", "network", "features", "done"];
+    let state, steps, cur = 0;
+
+    function show(name) {
+      cur = steps.indexOf(name);
+      document.querySelectorAll(".step").forEach((s) => s.classList.toggle("on", s.dataset.step === name));
+      $("#progress").innerHTML = steps.map((_, i) => `<i class="${i <= cur ? "done" : ""}"></i>`).join("");
+      document.querySelector(`.step[data-step="${name}"] input, .step[data-step="${name}"] button`)?.focus();
+    }
+    const next = () => show(steps[cur + 1]);
+    const back = () => show(steps[Math.max(0, cur - 1)]);
+    document.querySelectorAll("[data-next]").forEach((b) => b.addEventListener("click", next));
+    document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", back));
+
+    async function api(path, body) {
+      const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify(body) } : {});
+      if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "Something went wrong, try again");
+      return data;
+    }
+
+    // ---- password
+    function strength(pw) {
+      let s = Math.min(pw.length, 16) / 16;
+      if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s += .15;
+      if (/\d/.test(pw)) s += .1;
+      if (/[^A-Za-z0-9]/.test(pw)) s += .15;
+      return Math.min(s, 1);
+    }
+    $("#pw1").addEventListener("input", () => {
+      const s = strength($("#pw1").value), m = $("#pw-meter");
+      m.style.width = `${s * 100}%`;
+      m.style.background = s < .45 ? "var(--bad)" : s < .75 ? "#fbbf24" : "var(--ok)";
+    });
+    $("#pw-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pw1 = $("#pw1").value, pw2 = $("#pw2").value, err = $("#pw-err");
+      err.textContent = "";
+      if (pw1.length < state.min_password_length) return (err.textContent = `Use at least ${state.min_password_length} characters.`);
+      if (pw1 !== pw2) return (err.textContent = "The two passwords don't match.");
+      $("#pw-save").disabled = true;
+      try { await api("/api/password", { new: pw1 }); state.must_change_password = false; next(); }
+      catch (x) { err.textContent = x.message; }
+      finally { $("#pw-save").disabled = false; }
+    });
+
+    // ---- network
+    function fillNetwork(n) {
+      const ifs = n.interfaces.length ? n.interfaces : [{ name: n.iface, ip: n.self_ip, lan: n.lan }];
+      $("#iface").innerHTML = ifs.map((i) =>
+        `<option value="${i.name}" data-ip="${i.ip}" data-lan="${i.lan}" ${i.name === n.iface ? "selected" : ""}>${i.name} (${i.ip})</option>`).join("");
+      $("#self_ip").value = n.self_ip; $("#lan").value = n.lan; $("#router_ip").value = n.router_ip;
+      $("#router_name").value = n.router_name === "Router" ? "" : n.router_name;
+      const notes = [];
+      if (n.router_vendor) notes.push(`<div class="note info">Your router looks like a <b>${n.router_vendor}</b>.</div>`);
+      if (n.dynamic_ip) notes.push(`<div class="note info">This machine's address was handed out by your router and may change.
+        That's fine for monitoring. Gateway mode will help you give it a fixed address first.</div>`);
+      if (state.ipv6_ra) notes.push(`<div class="note warn"><b>Heads-up:</b> your router announces itself over IPv6. Devices that use
+        IPv6 for DNS will go around Netwatch, so you won't see their lookups and the ad blocker won't apply to them.
+        To fix it, turn off IPv6 on the LAN (or "Router Advertisements") in your router's settings.</div>`);
+      $("#net-notes").innerHTML = notes.join("");
+    }
+    $("#iface").addEventListener("change", () => {
+      const o = $("#iface").selectedOptions[0];
+      $("#self_ip").value = o.dataset.ip; $("#lan").value = o.dataset.lan;
+    });
+
+    // ---- finish
+    $("#finish").addEventListener("click", async () => {
+      const err = $("#feat-err"), btn = $("#finish");
+      err.textContent = ""; btn.disabled = true; btn.textContent = "Saving…";
+      const body = {
+        network: { iface: $("#iface").value, self_ip: $("#self_ip").value, lan: $("#lan").value,
+                   router_ip: $("#router_ip").value, router_name: $("#router_name").value },
+        adblock: $("#adblock").checked, require_approval: $("#require_approval").checked,
+        telegram_token: $("#telegram").value,
+      };
+      try {
+        const res = await api("/api/welcome/finish", body);
+        if (res.restarting) {
+          btn.textContent = "Applying your settings…";
+          await waitForRestart();
+        }
+        $("#done-msg").textContent = $("#adblock").checked
+          ? "Netwatch is watching your network in monitor-only mode. The ad blocker is ready for when you switch on gateway mode."
+          : "Netwatch is watching your network in monitor-only mode.";
+        show("done");
+      } catch (x) {
+        err.textContent = x.message;
+        if (/Network settings|interface/.test(x.message)) show("network");
+      } finally { btn.disabled = false; btn.textContent = "Finish setup"; }
+    });
+    async function waitForRestart() {
+      await new Promise((r) => setTimeout(r, 2500));
+      for (let i = 0; i < 40; i++) {
+        try { const r = await fetch("/api/welcome/state"); if (r.ok) return; } catch (_) {}
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    $("#go").addEventListener("click", () => (location.href = "/"));
+
+    (async () => {
+      state = await api("/api/welcome/state");
+      steps = STEPS.filter((s) => s !== "password" || state.must_change_password);
+      fillNetwork(state.network);
+      $("#adblock").checked = state.features.adblock;
+      $("#require_approval").checked = state.features.require_approval;
+      $("#tg-set").hidden = !state.features.telegram;
+      show(steps[0]);
+    })();
+  </script>
+</body>
+</html>

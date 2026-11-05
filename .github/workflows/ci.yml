@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell scripts
+        run: shellcheck --severity=warning install.sh scripts/netwatch lab/create-vm.sh lab/vm/*
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Python
+        run: |
+          pip install pyflakes
+          pyflakes gateway/app
+
+  build-and-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker compose build
+      - name: Self-test (firewall rules, first-run password, DHCP ranges, report chart)
+        run: docker run --rm --network none --cap-add NET_ADMIN netwatch:latest python -m app.selftest
+
+  install:
+    # The real one-line installer on a fresh Ubuntu runner, then a sign-in and the first-run guard.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install
+        run: sudo NETWATCH_SRC="$PWD" bash install.sh
+      - name: First run
+        run: |
+          set -eu
+          pw=$(sudo cat /opt/netwatch/data/initial-password)
+          curl -fsS -c jar -H 'Content-Type: application/json' -d "{\"password\":\"$pw\"}" http://127.0.0.1:8088/api/login
+          # Until the password is changed and setup is done, the dashboard sends you to /welcome
+          test "$(curl -s -b jar -o /dev/null -w '%{redirect_url}' http://127.0.0.1:8088/)" = "http://127.0.0.1:8088/welcome"
+          test "$(curl -s -b jar -o /dev/null -w '%{http_code}' http://127.0.0.1:8088/api/snapshot)" = 403
+          curl -fsS -b jar http://127.0.0.1:8088/api/welcome/state | jq -e '.must_change_password and (.setup_complete | not)'
+          sudo netwatch status
+      - name: Logs on failure
+        if: failure()
+        run: sudo docker logs netwatch

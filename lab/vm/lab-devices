@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Fake household devices on the lab LAN. Each one is a network namespace with its own MAC,
+# asks the LAN's DHCP server (Netwatch in gateway mode) for an address, then browses.
+#   lab-devices up      create the devices and start their traffic
+#   lab-devices down    remove them
+#   lab-devices add NAME [MAC]   a "new device joins the Wi-Fi" (to test approval)
+set -euo pipefail
+
+# name  mac  dhcp-hostname   (OUIs of real vendors, so Netwatch's vendor lookup has something to show)
+DEVICES=(
+  "phone   a4:c3:f0:11:22:01 Galaxy-S24"
+  "tv      a8:23:fe:11:22:02 LG-webOS-TV"
+  "laptop  3c:22:fb:11:22:03 MacBook-Air"
+)
+SITES=(wikipedia.org github.com ubuntu.com youtube.com netflix.com doubleclick.net googlesyndication.com)
+
+dev_up() {
+  local name=$1 mac=$2 host=$3 ifc="${1:0:10}0"
+  ip netns list | grep -qw "dev-$name" || ip netns add "dev-$name"
+  if ! ip link show "v-$name" >/dev/null 2>&1; then
+    ip link add "v-$name" type veth peer name "$ifc"
+    ip link set "$ifc" netns "dev-$name"
+    ip link set "v-$name" master lab-br up
+  fi
+  ip -n "dev-$name" link set "$ifc" address "$mac" up
+  ip -n "dev-$name" link set lo up
+  mkdir -p "/etc/netns/dev-$name" /var/lib/lab /etc/lab
+  : > "/etc/netns/dev-$name/resolv.conf"
+  printf 'send host-name = "%s";\n' "$host" > "/etc/dhcp/dhclient-lab-$name.conf"
+  if ! ip netns exec "dev-$name" ip -4 addr show "$ifc" | grep -q inet; then
+    ip netns exec "dev-$name" dhclient -4 -nw -cf "/etc/dhcp/dhclient-lab-$name.conf" \
+      -pf "/run/dhclient-lab-$name.pid" -lf "/var/lib/dhcp/dhclient.lab-$name.leases" "$ifc" || true
+  fi
+  # Ubuntu's dhclient hands DNS to systemd-resolved, not to the namespace's resolv.conf,
+  # so take the DNS server the DHCP server offered straight from the lease.
+  dns=""
+  for _ in $(seq 1 40); do
+    dns=$({ grep -h 'domain-name-servers' "/var/lib/dhcp/dhclient.lab-$name.leases" 2>/dev/null || true; } \
+          | tail -1 | sed -E 's/.*domain-name-servers ([^;]+);.*/\1/' | tr ',' ' ')
+    [ -n "$dns" ] && break; sleep 1
+  done
+  : > "/etc/netns/dev-$name/resolv.conf"
+  for ns in $dns; do echo "nameserver $ns" >> "/etc/netns/dev-$name/resolv.conf"; done
+  # Background browsing: look up a few sites and fetch one every 20-60 s.
+  if ! [ -f "/run/lab-$name.traffic" ] || ! kill -0 "$(cat "/run/lab-$name.traffic")" 2>/dev/null; then
+    ip netns exec "dev-$name" bash -c '
+      while true; do
+        set -- '"${SITES[*]}"'
+        site=$(shuf -n1 -e "$@")
+        getent hosts "$site" >/dev/null 2>&1
+        curl -s -o /dev/null --max-time 10 "https://$site" || true
+        sleep $((20 + RANDOM % 40))
+      done' >/dev/null 2>&1 &
+    echo $! > "/run/lab-$name.traffic"
+  fi
+  echo "  $name ($host, $mac) up"
+}
+
+dev_down() {
+  local name=$1
+  [ -f "/run/lab-$name.traffic" ] && kill "$(cat "/run/lab-$name.traffic")" 2>/dev/null || true
+  [ -f "/run/dhclient-lab-$name.pid" ] && kill "$(cat "/run/dhclient-lab-$name.pid")" 2>/dev/null || true
+  ip link del "v-$name" 2>/dev/null || true
+  ip netns del "dev-$name" 2>/dev/null || true
+  rm -f "/run/lab-$name.traffic" "/run/dhclient-lab-$name.pid" "/var/lib/dhcp/dhclient.lab-$name.leases"
+  echo "  $name removed"
+}
+
+case "${1:-up}" in
+  up)   for d in "${DEVICES[@]}"; do dev_up $d; done ;;
+  down) for d in "${DEVICES[@]}"; do dev_down ${d%% *}; done ;;
+  add)  name=${2:?name}; mac=${3:-02:$(openssl rand -hex 5 | sed 's/../&:/g;s/:$//')}
+        dev_up "$name" "$mac" "$name" ;;
+  remove) dev_down "${2:?name}" ;;
+  status)
+    for ns in $(ip netns list | awk '/^dev-/{print $1}'); do
+      printf '  %-12s %s\n' "${ns#dev-}" "$(ip -n "$ns" -4 -o addr show | awk '$2!="lo"{print $4}')"
+    done ;;
+  *) echo "usage: lab-devices up|down|add NAME [MAC]|remove NAME|status" >&2; exit 2 ;;
+esac

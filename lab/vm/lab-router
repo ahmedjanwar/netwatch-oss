@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# The lab's "router admin page": the fake ISP router's DHCP server, on or off.
+#   sudo lab-router dhcp on|off      sudo lab-router status
+set -euo pipefail
+PID=/run/lab-router-dnsmasq.pid
+stop() { [ -f $PID ] && kill "$(cat $PID)" 2>/dev/null || true; rm -f $PID; }
+start() {
+  stop
+  ip netns exec isp-router dnsmasq --pid-file=$PID --interface=r-lan-in --bind-interfaces \
+    --no-resolv --server=9.9.9.9 --server=149.112.112.112 --cache-size=500 \
+    ${1:+--dhcp-range=10.77.0.100,10.77.0.199,1h --dhcp-option=option:router,10.77.0.254 \
+      --dhcp-option=option:dns-server,10.77.0.254 --dhcp-leasefile=/var/lib/lab/router.leases}
+}
+mkdir -p /var/lib/lab
+case "${1:-status} ${2:-}" in
+  "dhcp on")  echo on > /var/lib/lab/router-dhcp;  start dhcp; echo "router: DHCP on (and DNS)" ;;
+  "dhcp off") echo off > /var/lib/lab/router-dhcp; start;      echo "router: DHCP off (DNS still on)" ;;
+  "status "*) echo "router DHCP: $(cat /var/lib/lab/router-dhcp 2>/dev/null || echo on)" ;;
+  *) echo "usage: sudo lab-router dhcp on|off | status" >&2; exit 2 ;;
+esac

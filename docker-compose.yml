@@ -1,0 +1,17 @@
+services:
+  netwatch:
+    build: ./gateway
+    image: netwatch:latest
+    container_name: netwatch
+    # Host networking + privileged: it has to manage the host's firewall,
+    # sysctls, DHCP and DNS on the real LAN interface.
+    network_mode: host
+    privileged: true
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - /etc/localtime:/etc/localtime:ro
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

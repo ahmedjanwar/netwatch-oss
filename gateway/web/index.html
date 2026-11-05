@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Netwatch</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo">◈</span> NETWATCH</div>
+    <div class="kpis">
+      <div class="kpi down"><label>Download</label><b id="k-down">–</b></div>
+      <div class="kpi up"><label>Upload</label><b id="k-up">–</b></div>
+      <div class="kpi"><label>Devices online</label><b id="k-online">–</b></div>
+      <div class="kpi"><label>Blocked</label><b id="k-blocked">–</b></div>
+      <button class="kpi shield-kpi" id="shield-toggle" title="Turn the ad blocker on or off" aria-pressed="false">
+        <label>Ad blocker</label>
+        <span class="shield-row"><span class="switch"><i></i></span><b id="k-shield">–</b></span>
+      </button>
+      <div class="kpi"><label>Mode</label><b id="k-mode">–</b></div>
+    </div>
+    <nav class="right">
+      <a href="/" class="nav active">Dashboard</a><a href="/insights" class="nav">Insights</a><a href="/settings" class="nav">Settings</a>
+      <span id="conn" class="conn off">offline</span><button id="logout" class="ghost">Log out</button>
+    </nav>
+  </header>
+
+  <div id="banner" class="banner hidden">
+    <b>Monitor mode.</b> Devices are discovered but their traffic doesn't pass through the gateway yet,
+    so only the gateway's own traffic is shown. <a href="/settings#setup">Open the setup guide</a> to switch to gateway mode.
+  </div>
+
+  <main>
+    <section class="map-wrap">
+      <canvas id="map"></canvas>
+      <div class="legend">
+        <span><i class="dot down"></i>download</span>
+        <span><i class="dot up"></i>upload</span>
+        <span><i class="ring solid"></i>routed via gateway</span>
+        <span><i class="ring dashed"></i>seen only</span>
+        <span><i class="dot blocked"></i>blocked</span>
+        <span>⚡ full-speed bypass</span>
+      </div>
+    </section>
+
+    <aside id="side">
+      <div id="list-view">
+        <div class="side-head">
+          <h2>Devices</h2>
+          <input id="search" placeholder="Search name, IP, vendor…" autocomplete="off">
+        </div>
+        <div id="device-list"></div>
+      </div>
+
+      <div id="detail-view" class="hidden">
+        <button id="back" class="ghost">← All devices</button>
+        <div class="d-head">
+          <div id="d-icon" class="d-icon"></div>
+          <div class="d-title">
+            <input id="d-name" maxlength="40" spellcheck="false" title="Click to rename">
+            <div id="d-status" class="d-status"></div>
+          </div>
+        </div>
+        <div class="d-rates">
+          <div class="down"><label>↓ Down</label><b id="d-down">–</b></div>
+          <div class="up"><label>↑ Up</label><b id="d-up">–</b></div>
+          <div><label>Today</label><b id="d-today">–</b></div>
+        </div>
+        <canvas id="d-chart" class="chart"></canvas>
+        <div class="chart-caption">Last 60 minutes, per minute (↑ download · ↓ upload)</div>
+        <dl id="d-meta" class="meta"></dl>
+        <div id="d-approve" class="approve-box hidden">
+          <b>⏳ Waiting for approval</b>
+          <p>This device is on your network but has no internet access until you decide.</p>
+          <div class="approve-actions">
+            <button data-verdict="allow" class="btn">✅ Allow</button>
+            <button data-verdict="allow_bypass" class="btn">⚡ Allow, full speed</button>
+            <button data-verdict="block" class="btn warn">🚫 Block</button>
+          </div>
+        </div>
+        <div id="d-pause" class="pause-row">
+          <span class="pause-label">⏸ Pause internet</span>
+          <button data-pause="30">30 min</button><button data-pause="60">1 hour</button><button data-pause="am">Till 7:00</button>
+        </div>
+        <button id="d-resume" class="resume-btn hidden"></button>
+        <button id="d-bypass" class="bypass-btn">⚡ Full speed: bypass Netwatch</button>
+        <div id="d-bypass-note" class="bypass-note"></div>
+        <button id="d-block" class="danger">Block internet</button>
+        <h3>Live connections <span id="d-conn-count" class="muted"></span></h3>
+        <div id="d-flows" class="flows"></div>
+        <h3>Top domains</h3>
+        <div id="d-domains" class="domains"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <section class="panel">
+      <h3>Throughput <span class="muted">last 10 min</span></h3>
+      <canvas id="total-chart" class="chart"></canvas>
+    </section>
+    <section class="panel">
+      <h3>Live DNS lookups</h3>
+      <div id="dns-feed" class="feed"></div>
+    </section>
+    <section class="panel">
+      <h3>Events</h3>
+      <div id="events" class="feed"></div>
+    </section>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
