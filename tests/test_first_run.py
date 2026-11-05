@@ -62,6 +62,10 @@ def test_first_run(client):
     assert client.get("/api/snapshot").status_code == 200
     assert client.get("/api/welcome/state").json()["network"]["router_name"] == "Hallway router"
 
+    # The version is shown in Settings
+    from app.version import __version__
+    assert client.get("/api/version").json() == {"version": __version__, "channel": "stable"}
+
     # Signing in again now needs the new password
     client.post("/api/logout")
     client.cookies.clear()

@@ -8,15 +8,17 @@
 # Options (environment variables):
 #   NETWATCH_DIR=/opt/netwatch     where to install
 #   NETWATCH_PORT=8088             dashboard port
+#   NETWATCH_CHANNEL=stable        stable = the latest release (default); edge = the latest code on main
 #   NETWATCH_REPO=<git url>        install from another repository or fork
-#   NETWATCH_REF=main              branch or tag to install
+#   NETWATCH_REF=v0.1.0            install a specific release, tag or branch
 #   NETWATCH_SRC=/path/to/netwatch install from a local copy instead of downloading (for testing)
 set -euo pipefail
 
 DIR=${NETWATCH_DIR:-/opt/netwatch}
 PORT=${NETWATCH_PORT:-8088}
 REPO=${NETWATCH_REPO:-https://github.com/ahmedjanwar/netwatch-oss.git}
-REF=${NETWATCH_REF:-main}
+CHANNEL=${NETWATCH_CHANNEL:-stable}
+REF=${NETWATCH_REF:-}
 
 bold=$(printf '\033[1m'); dim=$(printf '\033[2m'); green=$(printf '\033[32m'); red=$(printf '\033[31m'); off=$(printf '\033[0m')
 say()  { printf '%s\n' "${bold}==>${off} $*"; }
@@ -26,6 +28,7 @@ fail() { printf '%s\n' "${red}✗ $*${off}" >&2; exit 1; }
 [ "$(id -u)" = 0 ] || fail "Run the installer with sudo:  curl -fsSL … | sudo bash"
 [ "$(uname -s)" = Linux ] || fail "Netwatch runs on Linux (Ubuntu or Debian). It manages this machine's network, so it can't run on macOS or Windows."
 . /etc/os-release 2>/dev/null || fail "Couldn't tell which Linux this is (no /etc/os-release)."
+case "$CHANNEL" in stable|edge) ;; *) fail "NETWATCH_CHANNEL must be stable or edge" ;; esac
 case " ${ID:-} ${ID_LIKE:-} " in
   *" ubuntu "*|*" debian "*) ;;
   *) fail "Netwatch supports Ubuntu and Debian (and their derivatives). This is ${PRETTY_NAME:-unknown}." ;;
@@ -67,11 +70,18 @@ if [ -n "${NETWATCH_SRC:-}" ]; then
   mkdir -p "$DIR"
   (cd "$NETWATCH_SRC" && tar --exclude=./data --exclude=./.env --exclude=./.git -cf - .) | tar -xf - -C "$DIR"
 else
-  say "Downloading Netwatch ($REF)"
-  git clone -q --depth 1 --branch "$REF" "$REPO" "$DIR"
+  if [ -z "$REF" ] && [ "$CHANNEL" = stable ]; then
+    REF=$(git ls-remote --tags --refs "$REPO" 'v*' | sed 's#.*refs/tags/##' \
+          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+    [ -n "$REF" ] || { say "No release yet, installing the latest code on main"; CHANNEL=edge; }
+  fi
+  REF=${REF:-main}
+  say "Downloading Netwatch $REF"
+  git -c advice.detachedHead=false clone -q --depth 1 --branch "$REF" "$REPO" "$DIR"
 fi
 cd "$DIR"
 mkdir -p data && chmod 700 data
+[ -n "${NETWATCH_SRC:-}" ] || echo "$CHANNEL" > data/channel
 [ -f .env ] || printf '# Netwatch settings. Most are set in the dashboard; see .env.example for the rest.\nNW_PORT=%s\n' "$PORT" > .env
 chmod 600 .env
 
@@ -97,7 +107,7 @@ IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src")
 PW=$(cat data/initial-password)
 cat <<EOF
 
-${green}${bold}✓ Netwatch is running${off}  ${dim}(monitor-only: your network is unchanged)${off}
+${green}${bold}✓ Netwatch $(sed -n 's/^__version__ = "\(.*\)"/\1/p' gateway/app/version.py) is running${off}  ${dim}(monitor-only: your network is unchanged)${off}
 
   Open the dashboard:   ${bold}http://${IP:-this-machine}:$PORT${off}
   Temporary password:   ${bold}$PW${off}

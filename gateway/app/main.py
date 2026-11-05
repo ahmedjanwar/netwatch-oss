@@ -20,6 +20,7 @@ from .engine import Engine
 from . import insights
 from .setup import SetupChecks, apply_saved_mode, ipv6_router_advertising, load_settings, save_settings
 from .telegram import TelegramBot
+from .version import __version__
 from .adblock import ACTIVE as ADBLOCK_FILE, AdBlocker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -247,6 +248,15 @@ async def welcome_finish(body: SetupFinish):
         engine.settings_changed()
         await adblock.apply()
     return {"ok": True, "restarting": restart}
+
+
+@app.get("/api/version")
+async def version():
+    try:
+        channel = (Path(C.DATA) / "channel").read_text().strip() or "stable"
+    except OSError:
+        channel = "stable"
+    return {"version": __version__, "channel": channel}
 
 
 @app.get("/api/setup/status")

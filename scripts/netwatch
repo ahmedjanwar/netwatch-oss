@@ -5,7 +5,6 @@ set -euo pipefail
 DIR=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
 cd "$DIR"
 NETPLAN=/etc/netplan/99-netwatch-static.yaml
-export
 bold=$(printf '\033[1m'); dim=$(printf '\033[2m'); green=$(printf '\033[32m'); red=$(printf '\033[31m'); off=$(printf '\033[0m')
 say()  { printf '%s\n' "${bold}==>${off} $*"; }
 fail() { printf '%s\n' "${red}✗ $*${off}" >&2; exit 1; }
@@ -19,6 +18,15 @@ running() { [ "$(docker inspect -f '{{.State.Running}}' netwatch 2>/dev/null)" =
 # A value from Netwatch's own config (what setup saved, else what it detected).
 cfg() { docker exec netwatch python -c "from app import config as C; print(C.$1)" 2>/dev/null; }
 save_setting() { docker exec netwatch python -c "from app.setup import save_settings; save_settings($1)"; }
+# The installed version, from the code itself
+version() { sed -n 's/^__version__ = "\(.*\)"/\1/p' gateway/app/version.py 2>/dev/null || echo unknown; }
+# stable = the latest release (default); edge = the latest commit on main, for testers
+channel() { cat data/channel 2>/dev/null || echo stable; }
+# The newest release tag on GitHub, e.g. v0.2.0 ("" if there's none or we're offline)
+latest_release() {
+  git ls-remote --tags --refs origin 'v*' 2>/dev/null | sed 's#.*refs/tags/##' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
+}
 healthy() {
   for _ in $(seq 1 30); do
     sleep 1
@@ -38,7 +46,9 @@ ${bold}netwatch${off}: manage the Netwatch install in $DIR
   restart             restart Netwatch
   static-ip [revert]  give this machine a fixed IP (needed before gateway mode)
   gateway on|off      turn gateway mode on or off (same as the dashboard's setup guide)
-  update              update to the latest version (with self-test and automatic rollback)
+  version             the installed version, and whether a newer one is out
+  update              install the latest release (with self-test and automatic rollback)
+  channel stable|edge stable = releases (default), edge = the latest code on main, for testers
   uninstall           remove Netwatch
 
 Most commands need sudo.
@@ -52,6 +62,7 @@ case "$cmd" in
       echo "${green}●${off} Netwatch is running  ${dim}($(docker inspect -f '{{.State.StartedAt}}' netwatch | cut -d. -f1 | tr T ' '))${off}"
       echo "  Dashboard: $(url)"
       echo "  Mode:      $(cfg 'DHCP_ENABLED' | sed 's/True/gateway/;s/False/monitor only/')"
+      echo "  Version:   $(version) ($(channel) channel)"
     else
       echo "${red}●${off} Netwatch is not running. Try:  sudo netwatch restart   or see  sudo netwatch logs"
       exit 1
@@ -128,28 +139,56 @@ YAML
     echo "Gateway mode: $1"
     [ "$1" = off ] && echo "${dim}Turn your router's DHCP server back on, then reconnect your devices.${off}" ;;
 
+  version)
+    echo "Netwatch $(version) ($(channel) channel)"
+    if [ -d .git ] && [ "$(channel)" = stable ]; then
+      latest=$(latest_release)
+      if [ -z "$latest" ]; then echo "${dim}Couldn't check GitHub for a newer release.${off}"
+      elif [ "$latest" = "v$(version)" ]; then echo "${green}This is the latest release.${off}"
+      else echo "${bold}$latest is available.${off} Update with:  sudo netwatch update"; fi
+    fi ;;
+
+  channel)
+    need_root channel
+    case "${1:-}" in
+      stable|edge) ;;
+      "") echo "Channel: $(channel)"; exit 0 ;;
+      *) fail "usage: sudo netwatch channel stable|edge" ;;
+    esac
+    echo "$1" > data/channel
+    echo "Channel: $1"
+    exec "$0" update ;;
+
   update)
     need_root update
-    [ -d .git ] || fail "This copy wasn't installed from git, so it can't update itself. Reinstall to update."
-    say "Downloading the latest version"
-    old=$(git rev-parse HEAD)
-    git fetch -q --depth 1 origin && git reset -q --hard FETCH_HEAD
-    [ "$(git rev-parse HEAD)" = "$old" ] && { echo "Already up to date."; exit 0; }
+    [ -d .git ] || fail "This copy wasn't installed from GitHub, so it can't update itself. Reinstall to update."
+    old=$(git rev-parse HEAD); old_version=$(version)
+    if [ "$(channel)" = edge ]; then
+      say "Downloading the latest code on main ${dim}(edge channel)${off}"
+      git fetch -q --depth 1 origin main
+    else
+      latest=$(latest_release)
+      [ -n "$latest" ] || fail "Couldn't find a release on GitHub. Check this machine's internet connection."
+      say "Downloading Netwatch $latest"
+      git fetch -q --depth 1 origin tag "$latest" && git -c advice.detachedHead=false checkout -q "$latest"
+    fi
+    [ "$(channel)" = edge ] && git reset -q --hard FETCH_HEAD
+    [ "$(git rev-parse HEAD)" = "$old" ] && { echo "Already up to date ($(version), $(channel) channel)."; exit 0; }
     docker image inspect netwatch:latest >/dev/null 2>&1 && docker tag netwatch:latest netwatch:prev
     docker compose build -q
     say "Self-test"
     if ! docker run --rm --network none --cap-add NET_ADMIN netwatch:latest python -m app.selftest >/dev/null 2>&1; then
-      docker tag netwatch:prev netwatch:latest 2>/dev/null || true; git reset -q --hard "$old"
-      fail "The new version failed its self-test. Nothing changed; the current version keeps running."
+      docker tag netwatch:prev netwatch:latest 2>/dev/null || true; git -c advice.detachedHead=false checkout -q "$old"
+      fail "The new version failed its self-test. Nothing changed; $old_version keeps running."
     fi
     docker compose up -d >/dev/null
     if healthy; then
-      echo "${green}Updated to $(git log -1 --format='%h %s').${off}"
+      echo "${green}Updated: $old_version → $(version) ($(channel) channel).${off}"
     else
-      echo "${red}The new version didn't start properly; going back to the previous one.${off}" >&2
-      git reset -q --hard "$old"
+      echo "${red}The new version didn't start properly; going back to $old_version.${off}" >&2
+      git -c advice.detachedHead=false checkout -q "$old"
       docker tag netwatch:prev netwatch:latest 2>/dev/null && docker compose up -d --no-build --force-recreate >/dev/null
-      healthy && echo "Rolled back." >&2
+      healthy && echo "Rolled back to $old_version." >&2
       exit 1
     fi ;;
 

@@ -1,0 +1,80 @@
+name: Release
+
+# Publish a new Netwatch version: Actions → Release → Run workflow, then pick the bump.
+#   patch  0.1.0 → 0.1.1   fixes
+#   minor  0.1.0 → 0.2.0   new features
+#   major  0.1.0 → 1.0.0   changes to how people use it
+#   current               release the version already in the code (only for the first release)
+# Everything in CI must pass first. Then the version is bumped, CHANGELOG's "Unreleased" section becomes
+# the release notes, and the tag and GitHub Release are created. `sudo netwatch update` (stable channel)
+# installs it from there.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: What kind of release?
+        type: choice
+        options: [patch, minor, major, current]
+        default: patch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Releases are made from main, not ${GITHUB_REF_NAME}"
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump the version and write the release notes
+        id: version
+        run: |
+          version=$(python3 scripts/release.py "${{ inputs.bump }}" --notes "$RUNNER_TEMP/notes.md")
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version is already released. Add changes under Unreleased in CHANGELOG.md and release with patch, minor or major."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "### Netwatch v$version" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet; then
+            git commit -am "Release v$VERSION"
+          fi
+          git tag -a "v$VERSION" -m "Netwatch v$VERSION"
+          git push origin HEAD:main "v$VERSION"
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            cat "$RUNNER_TEMP/notes.md"
+            printf '\n---\n\n**Install:** `curl -fsSL https://raw.githubusercontent.com/%s/main/install.sh | sudo bash`\n' "$GITHUB_REPOSITORY"
+            printf '**Update an existing install:** `sudo netwatch update`\n'
+          } > "$RUNNER_TEMP/body.md"
+          gh release create "v$VERSION" --title "Netwatch v$VERSION" --notes-file "$RUNNER_TEMP/body.md" --verify-tag --latest

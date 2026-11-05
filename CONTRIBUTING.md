@@ -86,6 +86,24 @@ the loopback interface, so tests never touch a real network. For the web app, se
 - **No secrets in logs.** Never log passwords or tokens, and keep device data on the user's machine.
 - **Few dependencies.** The dashboard has no build step; please keep it that way.
 
+## Releases
+
+`main` is where changes land. Users on the default **stable** channel only get **releases**, so `main`
+can move faster than what people run at home.
+
+- In your pull request, describe the change under **Unreleased** in [CHANGELOG.md](CHANGELOG.md).
+  That text becomes the release notes.
+- To release (maintainers): **Actions → Release → Run workflow**, then pick the kind of release:
+  - **patch** (0.1.0 → 0.1.1): bug fixes
+  - **minor** (0.1.0 → 0.2.0): new features
+  - **major** (0.1.0 → 1.0.0): changes to how people install or use Netwatch
+
+  The workflow runs all of CI first (lint, tests, self-test, a real install). Then it bumps the version
+  in `gateway/app/version.py`, turns *Unreleased* into the new version's section, tags `vX.Y.Z` and
+  publishes the GitHub Release. Installs pick it up with `sudo netwatch update`.
+- To preview the notes locally: `python3 scripts/release.py patch --notes /tmp/notes.md` (then
+  `git checkout -- CHANGELOG.md gateway/app/version.py` to undo).
+
 ## Code of conduct
 
 Be kind and assume good intent. This project follows the

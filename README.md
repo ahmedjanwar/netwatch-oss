@@ -67,16 +67,36 @@ That's what lets it measure each device's traffic and block devices or ads. The 
 > router's DHCP back on. Use a machine that stays on, preferably with a wired connection.
 > **To undo everything:** turn your router's DHCP back on, then run `sudo netwatch gateway off`.
 
+## Updating
+
+Netwatch has numbered releases ([see what's new](https://github.com/ahmedjanwar/netwatch-oss/releases)).
+To update to the latest one:
+
+```sh
+sudo netwatch update     # installs the latest release, with a self-test and automatic rollback
+sudo netwatch version    # what you're running, and whether a newer release is out
+```
+
+**Channels:** by default you're on **stable**, which only gets releases. If you'd like to try changes as
+soon as they land on `main` and report problems, switch to **edge**, and back whenever you like:
+
+```sh
+sudo netwatch channel edge     # follow main (for testers)
+sudo netwatch channel stable   # back to releases
+```
+
 ## Commands
 
 ```
-sudo netwatch status           is it running, and where's the dashboard
+sudo netwatch status           is it running, where's the dashboard, which version
+sudo netwatch version          the installed version, and whether a newer one is out
 sudo netwatch password         show the temporary password from the installer
 sudo netwatch reset-password   forgot your password? get a new temporary one
 sudo netwatch logs             follow the logs
 sudo netwatch static-ip        give this machine a fixed IP (before gateway mode)
 sudo netwatch gateway on|off   switch gateway mode
-sudo netwatch update           update, with a self-test and automatic rollback
+sudo netwatch update           update to the latest release, with a self-test and rollback
+sudo netwatch channel edge     follow main instead of releases (stable to go back)
 sudo netwatch uninstall        remove Netwatch
 ```
 

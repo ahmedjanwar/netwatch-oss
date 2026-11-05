@@ -267,9 +267,15 @@
   
       </div>
     </details>
+    <p class="muted" id="nw-version" style="text-align:center;font-size:12px;margin:28px 0 8px"></p>
   </div>
 
 <script>
+fetch("/api/version").then((r) => r.json()).then((v) => {
+  document.getElementById("nw-version").innerHTML =
+    `Netwatch ${v.version} · ${v.channel} channel · update with <code>sudo netwatch update</code> · ` +
+    `<a href="https://github.com/ahmedjanwar/netwatch-oss/releases" target="_blank" rel="noopener">what's new</a>`;
+}).catch(() => {});
 "use strict";
 const $ = (s) => document.querySelector(s);
 
